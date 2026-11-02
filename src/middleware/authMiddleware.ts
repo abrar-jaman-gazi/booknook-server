@@ -21,20 +21,51 @@ export function verifyToken(
   res: Response,
   next: NextFunction
 ) {
+  const authHeader = req.headers.authorization;
+
+  // Check authorization header
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({
+      success: false,
+      message: "Authentication required. Please log in.",
+    });
+    return;
+  }
+
+  const token = authHeader.slice(7).trim();
+
+  if (!token) {
+    res.status(401).json({
+      success: false,
+      message: "Invalid authentication token.",
+    });
+    return;
+  }
+
+  const secret = process.env.JWT_SECRET;
+
+  // Missing server configuration is an internal error.
+  if (!secret) {
+    console.error("JWT_SECRET is not configured.");
+
+    res.status(500).json({
+      success: false,
+      message: "Authentication service is not configured.",
+    });
+    return;
+  }
+
   try {
-    const authHeader = req.headers.authorization;
+    // Accept only tokens signed using HS256.
+    const decoded = jwt.verify(token, secret, {
+      algorithms: ["HS256"],
+    });
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({
-        success: false,
-        message: "Authentication required. Please log in.",
-      });
-      return;
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    if (!token) {
+    // Validate decoded payload.
+    if (
+      typeof decoded !== "object" ||
+      decoded === null
+    ) {
       res.status(401).json({
         success: false,
         message: "Invalid authentication token.",
@@ -42,18 +73,15 @@ export function verifyToken(
       return;
     }
 
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-      throw new Error("JWT_SECRET is not configured.");
-    }
-
-    const decoded = jwt.verify(token, secret) as JwtPayload;
+    const payload = decoded as JwtPayload;
 
     if (
-      typeof decoded.id !== "string" ||
-      typeof decoded.email !== "string" ||
-      typeof decoded.name !== "string"
+      typeof payload.id !== "string" ||
+      !payload.id.trim() ||
+      typeof payload.email !== "string" ||
+      !payload.email.trim() ||
+      typeof payload.name !== "string" ||
+      !payload.name.trim()
     ) {
       res.status(401).json({
         success: false,
@@ -63,13 +91,15 @@ export function verifyToken(
     }
 
     req.user = {
-      id: decoded.id,
-      email: decoded.email,
-      name: decoded.name,
+      id: payload.id,
+      email: payload.email,
+      name: payload.name,
     };
 
     next();
   } catch (error) {
+    console.error("JWT verification failed:", error);
+
     res.status(401).json({
       success: false,
       message: "Invalid or expired authentication token.",

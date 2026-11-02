@@ -1,23 +1,40 @@
 
 import { Request, Response } from "express";
 import { ObjectId } from "mongodb";
+
 import { getDB } from "../config/db.js";
 import { BOOK_CATEGORIES } from "../models/Book.js";
 import { AuthenticatedRequest } from "../middleware/authMiddleware.js";
 
+// ============================================
 // Get all books (Public)
+// Optional query parameter: ?limit=6
+// Books are sorted newest first in MongoDB.
+// ============================================
+
 export async function getBooks(
-  _req: Request,
+  req: Request,
   res: Response
 ) {
   try {
     const db = getDB();
 
-    const books = await db
+    const cursor = db
       .collection("books")
       .find({})
-      .sort({ createdAt: -1 })
-      .toArray();
+      .sort({ createdAt: -1 });
+
+    const limitParam = req.query.limit;
+
+    if (typeof limitParam === "string") {
+      const limit = Number(limitParam);
+
+      if (Number.isInteger(limit) && limit > 0) {
+        cursor.limit(Math.min(limit, 100));
+      }
+    }
+
+    const books = await cursor.toArray();
 
     res.status(200).json({
       success: true,
@@ -34,7 +51,10 @@ export async function getBooks(
   }
 }
 
+// ============================================
 // Get a single book (Public)
+// ============================================
+
 export async function getBookById(
   req: Request,
   res: Response
@@ -78,7 +98,10 @@ export async function getBookById(
   }
 }
 
+// ============================================
 // Create a book (Authenticated)
+// ============================================
+
 export async function createBook(
   req: AuthenticatedRequest,
   res: Response
@@ -188,7 +211,10 @@ export async function createBook(
   }
 }
 
+// ============================================
 // Update a book (Owner only)
+// ============================================
+
 export async function updateBook(
   req: AuthenticatedRequest,
   res: Response
@@ -260,6 +286,7 @@ export async function updateBook(
         });
         return;
       }
+
       updates.title = title.trim();
     }
 
@@ -271,6 +298,7 @@ export async function updateBook(
         });
         return;
       }
+
       updates.author = author.trim();
     }
 
@@ -287,6 +315,7 @@ export async function updateBook(
         });
         return;
       }
+
       updates.category = category;
     }
 
@@ -298,6 +327,7 @@ export async function updateBook(
         });
         return;
       }
+
       updates.image = image.trim();
     }
 
@@ -309,6 +339,7 @@ export async function updateBook(
         });
         return;
       }
+
       updates.description = description.trim();
     }
 
@@ -384,7 +415,10 @@ export async function updateBook(
   }
 }
 
+// ============================================
 // Delete a book (Owner only)
+// ============================================
+
 export async function deleteBook(
   req: AuthenticatedRequest,
   res: Response
@@ -419,7 +453,8 @@ export async function deleteBook(
     if (result.deletedCount === 0) {
       res.status(404).json({
         success: false,
-        message: "Book not found or you are not authorized to delete it.",
+        message:
+          "Book not found or you are not authorized to delete it.",
       });
       return;
     }
