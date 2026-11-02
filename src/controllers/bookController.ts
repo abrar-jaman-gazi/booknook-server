@@ -467,6 +467,8 @@ export async function deleteBook(
     console.error("Delete book error:", error);
 
     res.status(500).json({
+
+      
       success: false,
       message: "Failed to delete book.",
     });
