@@ -39,4 +39,6 @@ export function getDB(): Db {
   }
 
   return database;
+
+  
 }
